@@ -733,10 +733,7 @@ int generate_moves(int color, move moves[]) {
                         };
 
                         for (int i = 0; i < 4; i++) {
-                            add_move(moves, &count,
-                                     start_file, start_rank,
-                                     end_file, end_rank,
-                                     piece);
+                            add_move(moves, &count, start_file, start_rank, end_file, end_rank, piece);
 
                             moves[count - 1].promotion = choices[i];
 
@@ -1019,10 +1016,10 @@ int minimax_score(int depth, int color, int alpha, int beta) {
 
     if (legal_count == 0) {
         if (controlled[!color][king_positions[color].file][king_positions[color].rank]) {
-            int checkmate_score = INF + depth;
+            int checkmate_score = 2 * INF + depth;
 
             // Side to move loses
-            return (color == WHITE) ? -checkmate_score : checkmate_score;
+            return (color == WHITE) ? checkmate_score : -checkmate_score;
         }
 
         return 0; // stalemate
@@ -1205,7 +1202,7 @@ move get_engine_move(int color) {
         return openings[rand() % ARRAY_SIZE(openings)];
     }
 
-    return minimax(4, color, 0);
+    return minimax(5, color, 0);
 }
 
 // GAME CODE
