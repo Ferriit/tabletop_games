@@ -1,4 +1,10 @@
-#include "lib.h"
+/*NOTE: This implementation of Blackjack was originally written for very limited systems.
+ * Any weird tricks like how stuff is stored or printed was originally to be able to compile without the c standard library.*/
+
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 enum suit {
     CLUB,
@@ -38,43 +44,45 @@ char c_player_points[4];
 
 char player_score[32];
 
+#ifdef _WIN32
+    #include <windows.h>
+
+    void sleep_us(unsigned int us)
+    {
+        if (us == 0)
+            return;
+
+        Sleep((us + 999) / 1000); // microseconds -> milliseconds (rounded up)
+    }
+
+#else
+    #include <unistd.h>
+
+    void sleep_us(unsigned int us)
+    {
+        usleep(us);
+    }
+
+#endif
+
 void render(const char *player, const char *dealer,
             const char *player_score, const char *dealer_score) {
 
-    print("\x1b[H\x1b[2J");
+    printf("\x1b[H\x1b[2J");
 
-    print("PLAYER: ");
-    print(player);
-    print("\n        ");
-    print(player_score);
-    print("\n\n");
-
-    print("DEALER: ");
-    print(dealer);
-    print("\n        ");
-    print(dealer_score);
-    print("\n\n");
+    printf("PLAYER: %s\n        %s\n\nDEALER: %s\n        %s\n\n", player, player_score, dealer, dealer_score);
 
     if (global_player_points > global_dealer_points) {
-        print(c_player_points);
-        print(" - ");
-        print(c_dealer_points);
-        print(" TO PLAYER\n");
+        printf("%s - %s TO PLAYER", c_player_points, c_dealer_points);
     }
     else if (global_dealer_points > global_player_points) {
-        print(c_dealer_points);
-        print(" - ");
-        print(c_player_points);
-        print(" TO DEALER\n");
+        printf("%s - %s TO DEALER", c_dealer_points, c_player_points);
     }
     else {
-        print(c_dealer_points);
-        print(" - ");
-        print(c_player_points);
-        print("\n");
+        printf("%s - %s", c_dealer_points, c_player_points);
     }
 
-    print("> Hit or Stand (h/s) (e to exit): ");
+    printf("\n> Hit or Stand (h/s) (e to exit): ");
 }
 
 void get_card(char buf[32], enum card card_num, enum suit card_suit) {
@@ -133,7 +141,7 @@ void deal_card(char *text, value *v, char *buf) {
     played_cards[card_count++] = id;
 
     get_card(buf, card, s);
-    c_str_append(text, buf);
+    strcat(text, buf);
 
     value c = get_value((enum card)card);
     v->low += c.low;
@@ -151,12 +159,12 @@ int dealer(char *player_text, value v, char* dealer_text) {
         int best = (v.high <= 21) ? v.high : v.low;
 
         char dealer_score[32];
-        c_int_to_str(best, dealer_score);
+        snprintf(dealer_score, sizeof(dealer_score), "%d", best);
 
         render(player_text, dealer_text, player_score, dealer_score);
 
         if (best > 21) {
-            print("\nDealer Bust\n");
+            printf("\nDealer Bust\n");
             global_player_points++;
             return 0;
         }
@@ -170,21 +178,22 @@ int dealer(char *player_text, value v, char* dealer_text) {
 }
 
 int game_round() {
-    srand(fast_seed());
+    srand((unsigned int)time(NULL));
 
     char buf[32];
 
     char player_text[128];
-    player_text[0] = 0;
+    player_text[0] = '\0';
 
     char dealer_text[128];
-    dealer_text[0] = 0;
+    dealer_text[0] = '\0';
 
     value player_v = {0, 0};
     value dealer_v = {0, 0};
 
     for (int i = 0; i < 52; i++)
         played_cards[i] = 65;
+
     card_count = 0;
 
     deal_card(player_text, &player_v, buf);
@@ -193,101 +202,96 @@ int game_round() {
     deal_card(dealer_text, &dealer_v, buf);
 
     char dealer_score_text[32];
-    c_int_to_str(dealer_v.low, dealer_score_text);
 
-    c_int_to_str(global_dealer_points, c_dealer_points);
-    c_int_to_str(global_player_points, c_player_points);
+    snprintf(dealer_score_text, sizeof(dealer_score_text), "%d", dealer_v.low);
+    snprintf(c_dealer_points, sizeof(c_dealer_points), "%d", global_dealer_points);
+    snprintf(c_player_points, sizeof(c_player_points), "%d", global_player_points);
 
     render(player_text, dealer_text, "?", dealer_score_text);
 
     int dealer_points = 0;
 
     while (1) {
-        if (player_v.low == player_v.high || player_v.high > 21)
-            c_int_to_str(player_v.low, player_score);
+        // Player score
+        if (player_v.low == player_v.high || player_v.high > 21) {
+            snprintf(player_score, sizeof(player_score), "%d", player_v.low);
+        }
         else {
-            char a[16], b[16];
-            c_int_to_str(player_v.low, a);
-            c_int_to_str(player_v.high, b);
-
-            int i = 0;
-            for (int j = 0; a[j]; j++) player_score[i++] = a[j];
-            player_score[i++] = '/';
-            for (int j = 0; b[j]; j++) player_score[i++] = b[j];
-            player_score[i] = 0;
+            snprintf(player_score, sizeof(player_score), "%d/%d", player_v.low, player_v.high);
         }
 
-        if (dealer_v.low == dealer_v.high || dealer_v.high > 21)
-            c_int_to_str(dealer_v.low, dealer_score_text);
+        // Dealer score
+        if (dealer_v.low == dealer_v.high || dealer_v.high > 21) {
+            snprintf(dealer_score_text, sizeof(dealer_score_text), "%d", dealer_v.low);
+        }
         else {
-            char a[16], b[16];
-            c_int_to_str(dealer_v.low, a);
-            c_int_to_str(dealer_v.high, b);
-
-            int i = 0;
-            for (int j = 0; a[j]; j++) dealer_score_text[i++] = a[j];
-            dealer_score_text[i++] = '/';
-            for (int j = 0; b[j]; j++) dealer_score_text[i++] = b[j];
-            dealer_score_text[i] = 0;
+            snprintf(dealer_score_text, sizeof(dealer_score_text), "%d/%d", dealer_v.low, dealer_v.high);
         }
 
         render(player_text, dealer_text, player_score, dealer_score_text);
 
         if (player_v.low > 21) {
-            print("\nPlayer Bust\n");
+            printf("\nPlayer Bust\n");
+
             global_dealer_points++;
+
             dealer_points = dealer(player_text, dealer_v, dealer_text);
             break;
         }
-
         char ans;
-        scan_c(&ans);
+
+        scanf(" %c", &ans);
 
         if (ans == 's' || ans == 'S') {
             dealer_points = dealer(player_text, dealer_v, dealer_text);
             break;
         }
 
-        if (ans == 'e' || ans == 'E')
+        if (ans == 'e' || ans == 'E') {
             return 1;
+        }
 
-        deal_card(player_text, &player_v, buf);
+        if (ans == 'h' || ans == 'H') {
+            deal_card(player_text, &player_v, buf);
+        }
     }
 
     int player_best = (player_v.high <= 21) ? player_v.high : player_v.low;
 
     if (dealer_points != 0 && player_best <= 21) {
         if (dealer_points > 21 && player_best > 21) {
-            print("\nBoth Bust\n");
+            printf("\nBoth Bust\n");
         }
         else if (dealer_points > 21) {
-            print("\nDealer Bust\n");
+            printf("\nDealer Bust\n");
         }
         else if (dealer_points > player_best) {
-            print("\nDealer Wins\n");
+            printf("\nDealer Wins\n");
             global_dealer_points++;
         }
         else if (dealer_points < player_best) {
-            print("\nPlayer Wins\n");
+            printf("\nPlayer Wins\n");
             global_player_points++;
         }
-        else
-            print("\nPush (Tie)\n");
+        else {
+            printf("\nPush (Tie)\n");
+        }
     }
 
-    c_int_to_str(global_dealer_points, c_dealer_points);
-    c_int_to_str(global_player_points, c_player_points);
+    snprintf(c_dealer_points, sizeof(c_dealer_points), "%d", global_dealer_points);
+    snprintf(c_player_points, sizeof(c_player_points), "%d", global_player_points);
 
-    print("Press Enter to continue...");
-    wait_enter();
+    printf("Press Enter to continue...");
+    getchar(); // consume newline
+    getchar(); // wait for enter
 
     return 0;
 }
 
-void _start() {
+int main() {
     while (1) {
         if (game_round() == 1)
             break;
     }
-    exit(0);
+    return 0;
 }
