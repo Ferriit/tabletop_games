@@ -1039,7 +1039,9 @@ int minimax_score(int depth, int color, int alpha, int beta) {
             int checkmate_score = 2 * INF + depth;
 
             // Side to move loses
-            return (color == WHITE) ? checkmate_score : -checkmate_score;
+            return (color == WHITE)
+                ? -checkmate_score
+                :  checkmate_score;
         }
 
         return 0; // stalemate
@@ -1061,6 +1063,8 @@ int minimax_score(int depth, int color, int alpha, int beta) {
                 board[legal_moves[i].start_file][legal_moves[i].start_rank];
 
             board[legal_moves[i].start_file][legal_moves[i].start_rank] = 0;
+
+            get_controlled_squares();
 
             update_king_position(legal_moves[i]);
 
