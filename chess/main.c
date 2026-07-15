@@ -174,6 +174,26 @@ void add_move(move moves[], int *count, int sf, int sr, int ef, int er, int piec
 }
 
 void get_controlled_squares();
+int count_legal_moves(int color);
+
+int is_checkmate(void) {
+    get_controlled_squares();
+
+    // White is checkmated
+    if (controlled[BLACK][king_positions[WHITE].file][king_positions[WHITE].rank] &&
+        count_legal_moves(WHITE) == 0) {
+        return WHITE;
+    }
+
+    // Black is checkmated
+    if (controlled[WHITE][king_positions[BLACK].file][king_positions[BLACK].rank] &&
+        count_legal_moves(BLACK) == 0) {
+        return BLACK;
+    }
+
+    return -1; // No checkmate
+}
+
 
 int can_castle(int color, int kingside) {
     if (color == WHITE) {
@@ -897,9 +917,9 @@ int evaluate() {
             // Pawn advancement
             if (type == PAWN) {
                 if (color == WHITE) {
-                    score += rank * 10;
+                    score += rank * 20;
                 } else {
-                    score -= (7 - rank) * 10;
+                    score -= (7 - rank) * 20;
                 }
             }
         }
@@ -1458,14 +1478,21 @@ int main(int argc, char** argv) {
             int valid = move_piece(input[0], input[1], input[2], input[3], input[4]);
             if (!valid) goto white_player_input;
 
-            get_controlled_squares();
-
             render(-1, -1, -1, -1);
+
+            if (is_checkmate()) {
+                return 0;
+            }
 
             move m = get_engine_move(BLACK);
             move_piece(m.start_file + 'A', m.start_rank + '1', m.end_file + 'A', m.end_rank + '1', m.promotion);
 
             render(m.start_file, m.start_rank, m.end_file, m.end_rank);
+
+            if (is_checkmate()) {
+                return 0;
+            }
+
             printf("%c%c%c%c\n", m.start_file + 'A', m.start_rank + '1', m.end_file + 'A', m.end_rank + '1');
             move_count++;
         }
@@ -1478,6 +1505,11 @@ int main(int argc, char** argv) {
             move_piece(m.start_file + 'A', m.start_rank + '1', m.end_file + 'A', m.end_rank + '1', m.promotion);
 
             render(m.start_file, m.start_rank, m.end_file, m.end_rank);
+
+            if (is_checkmate()) {
+                return 0;
+            }
+
             printf("%c%c%c%c\n", m.start_file + 'A', m.start_rank + '1', m.end_file + 'A', m.end_rank + '1');
 
             black_player_input:
@@ -1488,6 +1520,11 @@ int main(int argc, char** argv) {
             if (!valid) goto black_player_input;
 
             render(-1, -1, -1, -1);
+
+            if (is_checkmate()) {
+                return 0;
+            }
+
             move_count++;
         }
     }
