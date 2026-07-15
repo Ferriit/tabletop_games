@@ -359,9 +359,6 @@ int is_white_pawn_move(int start_file, int start_rank, int end_file, int end_ran
         last_move.end_rank == 4 &&
         last_move.end_file == end_file &&
         last_move.end_rank == start_rank) {
-        // Remove the captured pawn.
-        board[last_move.end_file][last_move.end_rank] = 0;
-
         return true;
     }
 
@@ -406,9 +403,6 @@ int is_black_pawn_move(int start_file, int start_rank, int end_file, int end_ran
              last_move.end_rank == 3 &&
              last_move.end_file == end_file &&
              last_move.end_rank == start_rank) {
-        // Remove the captured pawn.
-        board[last_move.end_file][last_move.end_rank] = 0;
-
         return true;
     }
 
@@ -630,6 +624,85 @@ int center_bonus(int file, int rank) {
     return bonus;
 }
 
+int is_move_legal(int color, move m) {
+    int temp_board[8][8];
+    position temp_positions[2];
+    
+    copy_board(temp_board, board);
+    copy_kings(temp_positions, king_positions);
+    
+    // Apply the move
+    board[m.end_file][m.end_rank] = board[m.start_file][m.start_rank];
+    board[m.start_file][m.start_rank] = 0;
+    
+    if (get_type(board[m.end_file][m.end_rank]) == KING) {
+        king_positions[color].file = m.end_file;
+        king_positions[color].rank = m.end_rank;
+    }
+    
+    // Check if the king is attacked by any enemy piece
+    int king_file = king_positions[color].file;
+    int king_rank = king_positions[color].rank;
+    
+    int legal = true;
+    check_only_attacking = true;
+    
+    for (int sf = 0; sf < 8 && legal; sf++) {
+        for (int sr = 0; sr < 8 && legal; sr++) {
+            int piece = board[sf][sr];
+            if (piece != 0 && get_color(piece) != color) {
+                if (is_move_valid(sf, sr, king_file, king_rank)) {
+                    legal = false;
+                }
+            }
+        }
+    }
+    
+    check_only_attacking = false;
+    
+    copy_board(board, temp_board);
+    copy_kings(king_positions, temp_positions);
+    
+    return legal;
+}
+
+int move_score_for_ordering(move m) {
+    int captured = board[m.end_file][m.end_rank];
+    int piece = board[m.start_file][m.start_rank];
+    
+    // Captures: prioritize by captured piece value
+    if (captured != 0) {
+        return 10000 + piece_values[get_type(captured)] * 10 - piece_values[get_type(piece)];
+    }
+    
+    // Promotions
+    if (m.promotion != 0) {
+        return 9000 + piece_values[get_type(m.promotion)];
+    }
+    
+    // Pawn moves
+    if (get_type(piece) == PAWN) {
+        return 100;
+    }
+    
+    return 0;
+}
+
+void sort_moves_by_score(move moves[], int count) {
+    for (int i = 0; i < count - 1; i++) {
+        for (int j = 0; j < count - i - 1; j++) {
+            int score1 = move_score_for_ordering(moves[j]);
+            int score2 = move_score_for_ordering(moves[j + 1]);
+            
+            if (score1 < score2) {
+                move temp = moves[j];
+                moves[j] = moves[j + 1];
+                moves[j + 1] = temp;
+            }
+        }
+    }
+}
+
 int generate_moves(int color, move moves[]) {
     int count = 0;
 
@@ -662,7 +735,6 @@ int generate_moves(int color, move moves[]) {
 
                         for (int i = 0; i < 4; i++) {
                             add_move(moves, &count, start_file, start_rank, end_file, end_rank, piece);
-
                             moves[count - 1].promotion = choices[i];
                         }
                     }
@@ -677,7 +749,6 @@ int generate_moves(int color, move moves[]) {
 
                         for (int i = 0; i < 4; i++) {
                             add_move(moves, &count, start_file, start_rank, end_file, end_rank, piece);
-
                             moves[count - 1].promotion = choices[i];
                         }
                     }
@@ -871,6 +942,21 @@ void apply_move(move m) {
         king_positions[get_color(piece)].rank = m.end_rank;
     }
 
+    // Handle en passant capture
+    if (piece == WHITE_PAWN &&
+        m.end_rank == m.start_rank + 1 &&
+        (m.end_file == m.start_file - 1 || m.end_file == m.start_file + 1) &&
+        board[m.end_file][m.end_rank - 1] == BLACK_PAWN) {
+        board[m.end_file][m.end_rank - 1] = 0;
+    }
+
+    if (piece == BLACK_PAWN &&
+        m.end_rank == m.start_rank - 1 &&
+        (m.end_file == m.start_file - 1 || m.end_file == m.start_file + 1) &&
+        board[m.end_file][m.end_rank + 1] == WHITE_PAWN) {
+        board[m.end_file][m.end_rank + 1] = 0;
+    }
+
     // Castle rook movement
     if (m.castle) {
         // Kingside
@@ -905,31 +991,52 @@ int minimax_score(int depth, int color, int alpha, int beta) {
 
     move moves[256];
     int move_count = generate_moves(color, moves);
+    
+    // Filter illegal moves and sort by score for better alpha-beta pruning
+    move legal_moves[256];
+    int legal_count = 0;
+    
+    for (int i = 0; i < move_count; i++) {
+        if (is_move_legal(color, moves[i])) {
+            legal_moves[legal_count++] = moves[i];
+        }
+    }
 
-    if (move_count == 0) {
+    if (legal_count == 0) {
         if (controlled[!color][king_positions[color].file][king_positions[color].rank]) {
             return (color == WHITE) ? -INF : INF;
         }
 
         return 0; // stalemate
     }
+    
+    sort_moves_by_score(legal_moves, legal_count);
 
     if (color == WHITE) {
         int best = -INF;
 
-        for (int i = 0; i < move_count; i++) {
+        for (int i = 0; i < legal_count; i++) {
             int temp_board[8][8];
             position temp_positions[2];
 
             copy_board(temp_board, board);
             copy_kings(temp_positions, king_positions);
 
-            board[moves[i].end_file][moves[i].end_rank] =
-                board[moves[i].start_file][moves[i].start_rank];
+            board[legal_moves[i].end_file][legal_moves[i].end_rank] =
+                board[legal_moves[i].start_file][legal_moves[i].start_rank];
 
-            board[moves[i].start_file][moves[i].start_rank] = 0;
+            board[legal_moves[i].start_file][legal_moves[i].start_rank] = 0;
 
-            update_king_position(moves[i]);
+            update_king_position(legal_moves[i]);
+
+            // Handle en passant capture
+            int piece = temp_board[legal_moves[i].start_file][legal_moves[i].start_rank];
+            if (piece == WHITE_PAWN &&
+                legal_moves[i].end_rank == legal_moves[i].start_rank + 1 &&
+                (legal_moves[i].end_file == legal_moves[i].start_file - 1 || legal_moves[i].end_file == legal_moves[i].start_file + 1) &&
+                board[legal_moves[i].end_file][legal_moves[i].end_rank - 1] == BLACK_PAWN) {
+                board[legal_moves[i].end_file][legal_moves[i].end_rank - 1] = 0;
+            }
 
             int score = minimax_score(depth - 1, BLACK, alpha, beta);
 
@@ -953,19 +1060,28 @@ int minimax_score(int depth, int color, int alpha, int beta) {
     else {
         int best = INF;
 
-        for (int i = 0; i < move_count; i++) {
+        for (int i = 0; i < legal_count; i++) {
             int temp_board[8][8];
             position temp_positions[2];
 
             copy_board(temp_board, board);
             copy_kings(temp_positions, king_positions);
 
-            board[moves[i].end_file][moves[i].end_rank] =
-                board[moves[i].start_file][moves[i].start_rank];
+            board[legal_moves[i].end_file][legal_moves[i].end_rank] =
+                board[legal_moves[i].start_file][legal_moves[i].start_rank];
 
-            board[moves[i].start_file][moves[i].start_rank] = 0;
+            board[legal_moves[i].start_file][legal_moves[i].start_rank] = 0;
 
-            update_king_position(moves[i]);
+            update_king_position(legal_moves[i]);
+
+            // Handle en passant capture
+            int piece = temp_board[legal_moves[i].start_file][legal_moves[i].start_rank];
+            if (piece == BLACK_PAWN &&
+                legal_moves[i].end_rank == legal_moves[i].start_rank - 1 &&
+                (legal_moves[i].end_file == legal_moves[i].start_file - 1 || legal_moves[i].end_file == legal_moves[i].start_file + 1) &&
+                board[legal_moves[i].end_file][legal_moves[i].end_rank + 1] == WHITE_PAWN) {
+                board[legal_moves[i].end_file][legal_moves[i].end_rank + 1] = 0;
+            }
 
             int score = minimax_score(depth - 1, WHITE, alpha, beta);
 
@@ -992,6 +1108,19 @@ move minimax(int depth, int color, int difficulty) {
     move moves[256];
     int move_count = generate_moves(color, moves);
 
+    // Filter illegal moves
+    move legal_moves[256];
+    int legal_count = 0;
+    
+    for (int i = 0; i < move_count; i++) {
+        if (is_move_legal(color, moves[i])) {
+            legal_moves[legal_count++] = moves[i];
+        }
+    }
+    
+    // Sort moves for better alpha-beta pruning
+    sort_moves_by_score(legal_moves, legal_count);
+
     move best_moves[256];
     int best_scores[256];
 
@@ -999,14 +1128,14 @@ move minimax(int depth, int color, int difficulty) {
 
     int best_score = (color == WHITE) ? -INF : INF;
 
-    for (int i = 0; i < move_count; i++) {
+    for (int i = 0; i < legal_count; i++) {
         int temp_board[8][8];
         position temp_positions[2];
 
         copy_board(temp_board, board);
         copy_kings(temp_positions, king_positions);
 
-        apply_move(moves[i]);
+        apply_move(legal_moves[i]);
 
         int score = minimax_score(depth - 1, !color, -INF, INF);
 
@@ -1019,12 +1148,12 @@ move minimax(int depth, int color, int difficulty) {
             best_score = score;
             count = 0;
 
-            best_moves[count] = moves[i];
+            best_moves[count] = legal_moves[i];
             best_scores[count] = score;
             count++;
         }
         else if (score == best_score) {
-            best_moves[count] = moves[i];
+            best_moves[count] = legal_moves[i];
             best_scores[count] = score;
             count++;
         }
@@ -1058,7 +1187,7 @@ move get_engine_move(int color) {
         return openings[rand() % ARRAY_SIZE(openings)];
     }
 
-    return minimax(3, color, 0);
+    return minimax(4, color, 0);
 }
 
 // GAME CODE
@@ -1095,6 +1224,8 @@ int move_piece(char start_file, char start_rank, char end_file, char end_rank, c
     // Save old state in case the move exposes the king
     int old_piece = board[end_file][end_rank];
     position old_king = king_positions[color];
+    int old_en_passant_piece = 0;
+    int en_passant_file = -1, en_passant_rank = -1;
 
     // Detect castling
     int castling = false;
@@ -1124,12 +1255,38 @@ int move_piece(char start_file, char start_rank, char end_file, char end_rank, c
         king_positions[color].rank = end_rank;
     }
 
+    // Handle en passant capture
+    if (piece == WHITE_PAWN &&
+        end_rank == start_rank + 1 &&
+        (end_file == start_file - 1 || end_file == start_file + 1) &&
+        board[end_file][end_rank - 1] == BLACK_PAWN) {
+        old_en_passant_piece = board[end_file][end_rank - 1];
+        en_passant_file = end_file;
+        en_passant_rank = end_rank - 1;
+        board[end_file][end_rank - 1] = 0;
+    }
+
+    if (piece == BLACK_PAWN &&
+        end_rank == start_rank - 1 &&
+        (end_file == start_file - 1 || end_file == start_file + 1) &&
+        board[end_file][end_rank + 1] == WHITE_PAWN) {
+        old_en_passant_piece = board[end_file][end_rank + 1];
+        en_passant_file = end_file;
+        en_passant_rank = end_rank + 1;
+        board[end_file][end_rank + 1] = 0;
+    }
+
     get_controlled_squares();
 
     // Illegal if king is in check
     if (controlled[!color][king_positions[color].file][king_positions[color].rank]) {
         board[start_file][start_rank] = piece;
         board[end_file][end_rank] = old_piece;
+
+        // Restore en passant captured pawn
+        if (en_passant_file != -1) {
+            board[en_passant_file][en_passant_rank] = old_en_passant_piece;
+        }
 
         if (castling) {
             if (end_file > start_file) { // Kingside
