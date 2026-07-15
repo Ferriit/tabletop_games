@@ -832,6 +832,11 @@ int is_repetition() {
 }
 
 int evaluate() {
+    // Check for repetition first - this is a draw and should be heavily penalized
+    if (is_repetition()) {
+        return (turn == WHITE) ? -(INF / 3) : (INF / 3);
+    }
+
     int score = 0;
 
     for (int file = 0; file < 8; file++) {
@@ -906,12 +911,6 @@ int evaluate() {
     if (controlled[WHITE][king_positions[BLACK].file][king_positions[BLACK].rank]) {
         score += 50;
     }
-
-    if (is_repetition()) {
-        return (turn == WHITE) ? -500 : 500;
-    }
-
-    score += (white_moves - black_moves) * 5;
 
     return score;
 }
@@ -1004,7 +1003,9 @@ int minimax_score(int depth, int color, int alpha, int beta) {
 
     if (legal_count == 0) {
         if (controlled[!color][king_positions[color].file][king_positions[color].rank]) {
-            return (color == WHITE) ? -INF : INF;
+            // Checkmate - prefer faster checkmates by subtracting depth
+            int checkmate_score = INF / (depth * depth);
+            return (color == WHITE) ? -checkmate_score : checkmate_score;
         }
 
         return 0; // stalemate
