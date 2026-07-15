@@ -717,14 +717,13 @@ int generate_moves(int color, move moves[]) {
             if (get_color(piece) != color)
                 continue;
 
-
             for (int end_file = 0; end_file < 8; end_file++) {
                 for (int end_rank = 0; end_rank < 8; end_rank++) {
+
                     if (!is_move_valid(start_file, start_rank, end_file, end_rank))
                         continue;
 
-
-                    // Promotions
+                    // White promotions
                     if (piece == WHITE_PAWN && end_rank == 7) {
                         int choices[] = {
                             WHITE_QUEEN,
@@ -734,11 +733,21 @@ int generate_moves(int color, move moves[]) {
                         };
 
                         for (int i = 0; i < 4; i++) {
-                            add_move(moves, &count, start_file, start_rank, end_file, end_rank, piece);
+                            add_move(moves, &count,
+                                     start_file, start_rank,
+                                     end_file, end_rank,
+                                     piece);
+
                             moves[count - 1].promotion = choices[i];
+
+                            // En passant
+                            if (board[end_file][end_rank] == 0 &&
+                                abs(end_file - start_file) == 1)
+                                moves[count - 1].en_passant = true;
                         }
                     }
 
+                    // Black promotions
                     else if (piece == BLACK_PAWN && end_rank == 0) {
                         int choices[] = {
                             BLACK_QUEEN,
@@ -748,17 +757,34 @@ int generate_moves(int color, move moves[]) {
                         };
 
                         for (int i = 0; i < 4; i++) {
-                            add_move(moves, &count, start_file, start_rank, end_file, end_rank, piece);
+                            add_move(moves, &count,
+                                     start_file, start_rank,
+                                     end_file, end_rank,
+                                     piece);
+
                             moves[count - 1].promotion = choices[i];
+
+                            if (board[end_file][end_rank] == 0 &&
+                                abs(end_file - start_file) == 1)
+                                moves[count - 1].en_passant = true;
                         }
                     }
 
                     else {
-                        add_move(moves, &count, start_file, start_rank, end_file, end_rank, piece);
+                        add_move(moves, &count,
+                                 start_file, start_rank,
+                                 end_file, end_rank,
+                                 piece);
+
+                        // Mark en passant moves
+                        if ((piece == WHITE_PAWN || piece == BLACK_PAWN) &&
+                            board[end_file][end_rank] == 0 &&
+                            abs(end_file - start_file) == 1) {
+                            moves[count - 1].en_passant = true;
+                        }
                     }
                 }
             }
-
 
             // Castling
             if (piece == WHITE_KING &&
@@ -775,7 +801,6 @@ int generate_moves(int color, move moves[]) {
                     moves[count - 1].castle = true;
                 }
             }
-
 
             if (piece == BLACK_KING &&
                 start_file == 4 &&
@@ -832,11 +857,6 @@ int is_repetition() {
 }
 
 int evaluate() {
-    // Check for repetition first - this is a draw and should be heavily penalized
-    if (is_repetition()) {
-        return (turn == WHITE) ? -(INF / 3) : (INF / 3);
-    }
-
     int score = 0;
 
     for (int file = 0; file < 8; file++) {
@@ -941,19 +961,11 @@ void apply_move(move m) {
         king_positions[get_color(piece)].rank = m.end_rank;
     }
 
-    // Handle en passant capture
-    if (piece == WHITE_PAWN &&
-        m.end_rank == m.start_rank + 1 &&
-        (m.end_file == m.start_file - 1 || m.end_file == m.start_file + 1) &&
-        board[m.end_file][m.end_rank - 1] == BLACK_PAWN) {
-        board[m.end_file][m.end_rank - 1] = 0;
-    }
-
-    if (piece == BLACK_PAWN &&
-        m.end_rank == m.start_rank - 1 &&
-        (m.end_file == m.start_file - 1 || m.end_file == m.start_file + 1) &&
-        board[m.end_file][m.end_rank + 1] == WHITE_PAWN) {
-        board[m.end_file][m.end_rank + 1] = 0;
+    if (m.en_passant) {
+        if (piece == WHITE_PAWN)
+            board[m.end_file][m.end_rank - 1] = 0;
+        else
+            board[m.end_file][m.end_rank + 1] = 0;
     }
 
     // Castle rook movement
@@ -984,6 +996,10 @@ void apply_move(move m) {
 }
 
 int minimax_score(int depth, int color, int alpha, int beta) {
+    if (is_repetition()) {
+        return 0;
+    }
+
     if (depth == 0) {
         return evaluate();
     }
@@ -1002,9 +1018,9 @@ int minimax_score(int depth, int color, int alpha, int beta) {
     }
 
     if (legal_count == 0) {
-        if (controlled[!color][king_positions[color].file][king_positions[color].rank]) {
+        if (controlled[color][king_positions[!color].file][king_positions[!color].rank]) {
             // Checkmate - prefer faster checkmates by subtracting depth
-            int checkmate_score = INF / (depth * depth);
+            int checkmate_score = INF + depth;
             return (color == WHITE) ? -checkmate_score : checkmate_score;
         }
 
