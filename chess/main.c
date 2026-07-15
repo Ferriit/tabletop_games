@@ -1415,6 +1415,13 @@ void render(int start_file, int start_rank, int end_file, int end_rank) {
                 printf("\x1b[38;5;255m");
             }
 
+            if ((board[file][7 - rank] == BLACK_KING) && controlled[WHITE][file][7 - rank]) {
+                printf("\x1b[48;5;196m");
+            }
+            if ((board[file][7 - rank] == WHITE_KING) && controlled[BLACK][file][7 - rank]) {
+                printf("\x1b[48;5;196m");
+            }
+
             printf("%s", piece_chars[board[file][7 - rank]]);
         }
         printf("\x1b[0m\n");
