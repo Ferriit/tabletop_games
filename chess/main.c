@@ -1018,9 +1018,10 @@ int minimax_score(int depth, int color, int alpha, int beta) {
     }
 
     if (legal_count == 0) {
-        if (controlled[color][king_positions[!color].file][king_positions[!color].rank]) {
-            // Checkmate - prefer faster checkmates by subtracting depth
+        if (controlled[!color][king_positions[color].file][king_positions[color].rank]) {
             int checkmate_score = INF + depth;
+
+            // Side to move loses
             return (color == WHITE) ? -checkmate_score : checkmate_score;
         }
 
