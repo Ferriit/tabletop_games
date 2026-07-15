@@ -1017,16 +1017,38 @@ int minimax_score(int depth, int color, int alpha, int beta) {
         return 0;
     }
 
+    move moves[256];
+    int move_count = generate_moves(color, moves);
+
+    move legal_moves[256];
+    int legal_count = 0;
+
+    for (int i = 0; i < move_count; i++) {
+        if (is_move_legal(color, moves[i])) {
+            legal_moves[legal_count++] = moves[i];
+        }
+    }
+
+    // Checkmate / stalemate BEFORE depth cutoff
+    if (legal_count == 0) {
+
+        if (controlled[!color]
+            [king_positions[color].file]
+            [king_positions[color].rank]) {
+
+            int mate_score = INF + depth;
+
+            return (color == WHITE)
+                ? -mate_score
+                : mate_score;
+        }
+
+        return 0;
+    }
+
     if (depth == 0) {
         return evaluate();
     }
-
-    move moves[256];
-    int move_count = generate_moves(color, moves);
-    
-    // Filter illegal moves and sort by score for better alpha-beta pruning
-    move legal_moves[256];
-    int legal_count = 0;
     
     for (int i = 0; i < move_count; i++) {
         if (is_move_legal(color, moves[i])) {
@@ -1034,17 +1056,16 @@ int minimax_score(int depth, int color, int alpha, int beta) {
         }
     }
 
+    get_controlled_squares();
+
     if (legal_count == 0) {
         if (controlled[!color][king_positions[color].file][king_positions[color].rank]) {
-            int checkmate_score = 2 * INF + depth;
-
-            // Side to move loses
             return (color == WHITE)
-                ? -checkmate_score
-                :  checkmate_score;
+                ? -(2 * INF + depth)
+                :  (2 * INF + depth);
         }
 
-        return 0; // stalemate
+        return 0;
     }
     
     sort_moves_by_score(legal_moves, legal_count);
@@ -1064,9 +1085,8 @@ int minimax_score(int depth, int color, int alpha, int beta) {
 
             board[legal_moves[i].start_file][legal_moves[i].start_rank] = 0;
 
-            get_controlled_squares();
-
             update_king_position(legal_moves[i]);
+            get_controlled_squares();
 
             // Handle en passant capture
             int piece = temp_board[legal_moves[i].start_file][legal_moves[i].start_rank];
@@ -1112,6 +1132,7 @@ int minimax_score(int depth, int color, int alpha, int beta) {
             board[legal_moves[i].start_file][legal_moves[i].start_rank] = 0;
 
             update_king_position(legal_moves[i]);
+            get_controlled_squares();
 
             // Handle en passant capture
             int piece = temp_board[legal_moves[i].start_file][legal_moves[i].start_rank];
@@ -1226,7 +1247,7 @@ move get_engine_move(int color) {
         return openings[rand() % ARRAY_SIZE(openings)];
     }
 
-    return minimax(5, color, 0);
+    return minimax(4, color, 0);
 }
 
 // GAME CODE
