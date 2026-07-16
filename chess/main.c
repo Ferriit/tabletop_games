@@ -876,12 +876,32 @@ int is_repetition() {
 int evaluate() {
     int score = 0;
 
+    int white_material = 0;
+    int black_material = 0;
+
+    // Count non-pawn material
+    for (int file = 0; file < 8; file++) {
+        for (int rank = 0; rank < 8; rank++) {
+            int piece = board[file][rank];
+            if (!piece)
+                continue;
+
+            int type = get_type(piece);
+
+            if (type != PAWN && type != KING) {
+                if (get_color(piece) == WHITE)
+                    white_material += piece_values[type];
+                else
+                    black_material += piece_values[type];
+            }
+        }
+    }
+
     for (int file = 0; file < 8; file++) {
         for (int rank = 0; rank < 8; rank++) {
 
             int piece = board[file][rank];
-
-            if (piece == 0)
+            if (!piece)
                 continue;
 
             int type = get_type(piece);
@@ -889,42 +909,43 @@ int evaluate() {
 
             int value = piece_values[type];
 
-            // White pieces add, black pieces subtract
-            if (color == WHITE) {
-                score += value;
-            } else {
-                score -= value;
+            // Pawns become more valuable as friendly material disappears
+            if (type == PAWN) {
+                int missing_material;
+
+                if (color == WHITE)
+                    missing_material = 3100 - white_material;
+                else
+                    missing_material = 3100 - black_material;
+
+                value += missing_material / 32;
             }
 
+            if (color == WHITE)
+                score += value;
+            else
+                score -= value;
 
-            // Piece-square bonuses
             int positional = 0;
 
-            if (type == KNIGHT) {
+            if (type == KNIGHT)
                 positional = knight_table[file][rank];
-            }
 
             positional += center_bonus(file, rank);
 
-
-            if (color == WHITE) {
-                score += positional;
-            } else {
-                score -= positional;
-            }
-
-
-            // Pawn advancement
             if (type == PAWN) {
-                if (color == WHITE) {
-                    score += rank * 30;
-                } else {
-                    score -= (7 - rank) * 30;
-                }
+                if (color == WHITE)
+                    positional += rank * 30;
+                else
+                    positional += (7 - rank) * 30;
             }
+
+            if (color == WHITE)
+                score += positional;
+            else
+                score -= positional;
         }
     }
-
 
     // Mobility
     int old_turn = turn;
@@ -939,15 +960,12 @@ int evaluate() {
 
     score += (white_moves - black_moves) * 10;
 
-
     // King safety
-    if (controlled[BLACK][king_positions[WHITE].file][king_positions[WHITE].rank]) {
+    if (controlled[BLACK][king_positions[WHITE].file][king_positions[WHITE].rank])
         score -= 100;
-    }
 
-    if (controlled[WHITE][king_positions[BLACK].file][king_positions[BLACK].rank]) {
+    if (controlled[WHITE][king_positions[BLACK].file][king_positions[BLACK].rank])
         score += 100;
-    }
 
     return score;
 }
@@ -1421,7 +1439,7 @@ void render(int start_file, int start_rank, int end_file, int end_rank) {
     };
     printf("\x1b[H\x1b[2J");
 
-    int score = evaluate();
+    int score = minimax_score(2, WHITE, -INF, INF);
 
     printf("%d\n", score);
 
