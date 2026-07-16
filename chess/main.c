@@ -917,9 +917,9 @@ int evaluate() {
             // Pawn advancement
             if (type == PAWN) {
                 if (color == WHITE) {
-                    score += rank * 20;
+                    score += rank * 30;
                 } else {
-                    score -= (7 - rank) * 20;
+                    score -= (7 - rank) * 30;
                 }
             }
         }
@@ -937,16 +937,16 @@ int evaluate() {
 
     turn = old_turn;
 
-    score += (white_moves - black_moves) * 5;
+    score += (white_moves - black_moves) * 10;
 
 
     // King safety
     if (controlled[BLACK][king_positions[WHITE].file][king_positions[WHITE].rank]) {
-        score -= 50;
+        score -= 100;
     }
 
     if (controlled[WHITE][king_positions[BLACK].file][king_positions[BLACK].rank]) {
-        score += 50;
+        score += 100;
     }
 
     return score;
@@ -1505,18 +1505,10 @@ int main(int argc, char** argv) {
 
             render(-1, -1, -1, -1);
 
-            if (is_checkmate()) {
-                return 0;
-            }
-
             move m = get_engine_move(BLACK);
             move_piece(m.start_file + 'A', m.start_rank + '1', m.end_file + 'A', m.end_rank + '1', m.promotion);
 
             render(m.start_file, m.start_rank, m.end_file, m.end_rank);
-
-            if (is_checkmate()) {
-                return 0;
-            }
 
             printf("%c%c%c%c\n", m.start_file + 'A', m.start_rank + '1', m.end_file + 'A', m.end_rank + '1');
             move_count++;
@@ -1531,10 +1523,6 @@ int main(int argc, char** argv) {
 
             render(m.start_file, m.start_rank, m.end_file, m.end_rank);
 
-            if (is_checkmate()) {
-                return 0;
-            }
-
             printf("%c%c%c%c\n", m.start_file + 'A', m.start_rank + '1', m.end_file + 'A', m.end_rank + '1');
 
             black_player_input:
@@ -1545,10 +1533,6 @@ int main(int argc, char** argv) {
             if (!valid) goto black_player_input;
 
             render(-1, -1, -1, -1);
-
-            if (is_checkmate()) {
-                return 0;
-            }
 
             move_count++;
         }

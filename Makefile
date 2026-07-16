@@ -1,5 +1,5 @@
 CC := gcc
-C_FLAGS := -Oz -s
+C_FLAGS := -O3 -s
 
 DIST_DIR := dist/
 
