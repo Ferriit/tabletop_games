@@ -5,7 +5,7 @@ DIST_DIR := dist/
 
 default: all
 
-all: chess blackjack
+all: chess blackjack five_in_a_row
 
 clean:
 	rm -rf ${DIST_DIR}
@@ -19,3 +19,5 @@ chess: dist_dir
 blackjack: dist_dir
 	${CC} blackjack/main.c ${C_FLAGS} -o ${DIST_DIR}blackjack
 
+five_in_a_row: dist_dir
+	${CC} five_in_a_row/main.c ${C_FLAGS} -o ${DIST_DIR}five_in_a_row
