@@ -1265,7 +1265,7 @@ move get_engine_move(int color) {
         return openings[rand() % ARRAY_SIZE(openings)];
     }
 
-    return minimax(4, color, 0);
+    return minimax(3, color, 0);
 }
 
 // GAME CODE
