@@ -329,7 +329,7 @@ int main() {
             return 0;
 
         int move;
-        minimax(board, 8, P2, -100000000, 100000000, &move);
+        minimax(board, 6, P2, -100000000, 100000000, &move);
         place_piece(P2, move);
 
         if (is_winning(board) != 0)
