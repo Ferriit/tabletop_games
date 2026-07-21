@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define BOARD_HEIGHT 50
-#define BOARD_WIDTH 50
+#define BOARD_HEIGHT 25
+#define BOARD_WIDTH 25
 
 enum SYMBOL {
     CROSS, CIRCLE, NONE
@@ -136,7 +136,7 @@ void render() {
         printf("\n");
     }
 
-    printf("\x1b[0m   ");
+    printf("\x1b[0m  ");
     for (int i = 0; i < BOARD_WIDTH; i++) {
         if (i % 2) {
             printf("\x1b[40;37m%c ", int_to_id(i));
@@ -147,50 +147,193 @@ void render() {
     printf("\n");
 }
 
-int minimax(int board[BOARD_WIDTH][BOARD_HEIGHT], int depth, int turn, pos* best_move) {
+int evaluate_window(int board[BOARD_WIDTH][BOARD_HEIGHT], int x, int y, int dx, int dy) {
+    int cross = 0;
+    int circle = 0;
+    int empty = 0;
+
+    for (int i = 0; i < 5; i++) {
+        int nx = x + dx * i;
+        int ny = y + dy * i;
+
+        if (nx < 0 || nx >= BOARD_WIDTH ||
+            ny < 0 || ny >= BOARD_HEIGHT)
+            return 0;
+
+        if (board[nx][ny] == CROSS)
+            cross++;
+        else if (board[nx][ny] == CIRCLE)
+            circle++;
+        else
+            empty++;
+    }
+
+    if (cross && circle)
+        return 0;
+
+    // Winning
+    if (circle == 5)
+        return 10000000;
+
+    if (cross == 5)
+        return -10000000;
+
+
+    // Blocking opponent
+    if (cross == 4 && empty == 1)
+        return -1000000;
+
+    // Winning opportunity
+    if (circle == 4 && empty == 1)
+        return 1000000;
+
+
+    // Strong threats
+    if (circle == 3 && empty == 2)
+        return 50000;
+
+    if (cross == 3 && empty == 2)
+        return -50000;
+
+
+    if (circle == 2 && empty == 3)
+        return 5000;
+
+    if (cross == 2 && empty == 3)
+        return -5000;
+
+
+    return 0;
+}
+
+int evaluate_connections(int board[BOARD_WIDTH][BOARD_HEIGHT]) {
+    int score = 0;
+
+    int directions[8][2] = {
+        {1,0}, {-1,0},
+        {0,1}, {0,-1},
+        {1,1}, {-1,-1},
+        {1,-1}, {-1,1}
+    };
+
+    for (int y = 0; y < BOARD_HEIGHT; y++) {
+        for (int x = 0; x < BOARD_WIDTH; x++) {
+            if (board[x][y] == NONE)
+                continue;
+
+            int friends = 0;
+
+            for (int d = 0; d < 8; d++) {
+                int nx = x + directions[d][0];
+                int ny = y + directions[d][1];
+
+                if (nx >= 0 && nx < BOARD_WIDTH &&
+                    ny >= 0 && ny < BOARD_HEIGHT &&
+                    board[nx][ny] == board[x][y]) {
+                    friends++;
+                }
+            }
+
+            if (board[x][y] == CIRCLE)
+                score += friends * 50;
+            else
+                score -= friends * 50;
+        }
+    }
+
+    return score;
+}
+
+int evaluate(int board[BOARD_WIDTH][BOARD_HEIGHT]) {
+    int score = 0;
+
+    int directions[4][2] = {
+        {1,0},
+        {0,1},
+        {1,1},
+        {1,-1}
+    };
+
+    for (int y = 0; y < BOARD_HEIGHT; y++) {
+        for (int x = 0; x < BOARD_WIDTH; x++) {
+            for (int d = 0; d < 4; d++) {
+                score += evaluate_window(
+                    board, x, y,
+                    directions[d][0],
+                    directions[d][1]
+                );
+            }
+        }
+    }
+
+    score += evaluate_connections(board);
+
+    return score;
+}
+
+int minimax(int board[BOARD_WIDTH][BOARD_HEIGHT], int depth, int turn, int alpha, int beta, pos* best_move) {
     int winning = is_winning(board);
 
-    if (winning != 0)
-        return winning;
+    if (winning != 0) {
+        return winning * 10000000 + depth;
+    }
 
     if (depth == 0)
-        return 0;
+        return evaluate(board);
 
     pos moves[BOARD_WIDTH * BOARD_HEIGHT];
     int move_count = get_valid_moves(board, moves);
 
-    int best_score = turn == 0 ? -1000000 : 1000000;
+    if (move_count == 0)
+        return 0;
+
+    int best_score;
+    if (turn == CIRCLE)
+        best_score = -100000000; // maximize
+    else
+        best_score = 100000000;  // minimize
+
     pos best = {-1, -1};
 
     for (int i = 0; i < move_count; i++) {
-        int temp_board[BOARD_WIDTH][BOARD_HEIGHT];
-
-        // Copy board
-        for (int y = 0; y < BOARD_HEIGHT; y++) {
-            for (int x = 0; x < BOARD_WIDTH; x++) {
-                temp_board[x][y] = board[x][y];
-            }
-        }
+        int x = moves[i].x;
+        int y = moves[i].y;
 
         // Make move
-        temp_board[moves[i].x][moves[i].y] = turn ? CIRCLE : CROSS;
+        board[x][y] = turn;
 
-        // Recurse
-        int score = minimax(temp_board, depth - 1, !turn, NULL);
+        int score = minimax(board, depth - 1,
+                            turn == CIRCLE ? CROSS : CIRCLE,
+                            alpha, beta, NULL);
 
-        if (turn == 0) {
-            // CROSS maximizes
+        // Undo move
+        board[x][y] = NONE;
+
+
+        if (turn == CIRCLE) {
+            // AI tries to maximize score
             if (score > best_score) {
                 best_score = score;
                 best = moves[i];
             }
+
+            if (best_score > alpha)
+                alpha = best_score;
+
         } else {
-            // CIRCLE minimizes
+            // Player tries to minimize score
             if (score < best_score) {
                 best_score = score;
                 best = moves[i];
             }
+
+            if (best_score < beta)
+                beta = best_score;
         }
+
+        // Alpha-beta pruning
+        if (beta <= alpha)
+            break;
     }
 
     if (best_move != NULL)
@@ -223,7 +366,7 @@ int main() {
         render();
 
         pos move;
-        int score = minimax(board, 5, CIRCLE, &move);
+        int score = minimax(board, 3, CIRCLE, -1000000, 1000000, &move);
 
         board[move.x][move.y] = CIRCLE;
 
