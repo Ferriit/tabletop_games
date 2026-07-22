@@ -133,7 +133,7 @@ void render(pos ai_move) {
                     }
                 } else if (sym == CIRCLE) {
                     if (x == ai_move.x && y == ai_move.y)
-                        printf("\x1b[37m");
+                        printf("\x1b[38;5;13m");
                     else
                         printf("\x1b[38;5;208m");
                     switch (i) {
