@@ -128,13 +128,13 @@ void render() {
 
                 if (sym == CROSS) {
                     switch (i) {
-                        case 0: printf("\x1b[38;5;99m\\__/"); break;
+                        case 0: printf("\x1b[38;5;99m\\  /"); break;
                         case 1: printf("\x1b[38;5;99m/  \\"); break;
                     }
                 } else if (sym == CIRCLE) {
                     switch (i) {
-                        case 0: printf("\x1b[38;5;208m/‾‾\\"); break;
-                        case 1: printf("\x1b[38;5;208m\\__/"); break;
+                        case 0: printf("\x1b[38;5;208m/  \\"); break;
+                        case 1: printf("\x1b[38;5;208m\\  /"); break;
                     }
                 } else {
                     if (i == 0) {
