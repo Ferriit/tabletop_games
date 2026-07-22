@@ -14,6 +14,8 @@ typedef struct {
 
 int board[BOARD_WIDTH][BOARD_HEIGHT];
 
+int score = 0;
+
 int get_valid_moves(int board[BOARD_WIDTH][BOARD_HEIGHT], pos positions[BOARD_WIDTH * BOARD_HEIGHT]) {
     int count = 0;
 
@@ -101,7 +103,7 @@ int is_winning(int board[BOARD_WIDTH][BOARD_HEIGHT]) {
                 }
 
                 if (count == 5) {
-                    return piece == CROSS ? 1 : -1;
+                    return piece == CIRCLE ? 1 : -1;
                 }
             }
         }
@@ -111,40 +113,40 @@ int is_winning(int board[BOARD_WIDTH][BOARD_HEIGHT]) {
 }
 
 void render() {
-    printf("\x1b[H\x1b[2J");
+    printf("\x1b[H\x1b[2J\x1b[0m%d\n", score);
 
     for (int y = 0; y < BOARD_HEIGHT; y++) {
-        printf("\x1b[0m%c ", int_to_id(y));
+        for (int i = 0; i < 2; i++) {
+            for (int x = 0; x < BOARD_WIDTH; x++) {
+                enum SYMBOL sym = board[x][y];
 
-        for (int x = 0; x < BOARD_WIDTH; x++) {
-            enum SYMBOL sym = board[x][y];
+                if ((y + x) % 2) {
+                    printf("\x1b[48;5;232m\x1b[38;5;237m");
+                } else {
+                    printf("\x1b[48;5;237m\x1b[38;5;232m");
+                }
 
-            if ((y + x) % 2) {
-                printf("\x1b[48;5;232m");
-            } else {
-                printf("\x1b[48;5;237m");
+                if (sym == CROSS) {
+                    switch (i) {
+                        case 0: printf("\x1b[38;5;99m\\__/"); break;
+                        case 1: printf("\x1b[38;5;99m/  \\"); break;
+                    }
+                } else if (sym == CIRCLE) {
+                    switch (i) {
+                        case 0: printf("\x1b[38;5;208m/‾‾\\"); break;
+                        case 1: printf("\x1b[38;5;208m\\__/"); break;
+                    }
+                } else {
+                    if (i == 0) {
+                        printf("%c%c  ", int_to_id(x), int_to_id(y));
+                    } else {
+                        printf("    ");
+                    }
+                }
             }
-
-            if (sym == CROSS) {
-                printf("\x1b[38;5;99mX ");
-            } else if (sym == CIRCLE) {
-                printf("\x1b[38;5;208mO ");
-            } else {
-                printf("  ");
-            }
-        }
-        printf("\n");
-    }
-
-    printf("\x1b[0m  ");
-    for (int i = 0; i < BOARD_WIDTH; i++) {
-        if (i % 2) {
-            printf("\x1b[40;37m%c ", int_to_id(i));
-        } else {
-            printf("\x1b[47;30m%c ", int_to_id(i));
+            printf("\x1b[0m\n");
         }
     }
-    printf("\n");
 }
 
 int evaluate_window(int board[BOARD_WIDTH][BOARD_HEIGHT], int x, int y, int dx, int dy) {
@@ -178,8 +180,7 @@ int evaluate_window(int board[BOARD_WIDTH][BOARD_HEIGHT], int x, int y, int dx, 
     if (cross == 5)
         return -10000000;
 
-
-    // Blocking opponent
+        // Blocking opponent
     if (cross == 4 && empty == 1)
         return -1000000;
 
@@ -354,6 +355,7 @@ int main() {
     char inbuf[3] = "\0\0\0";
 
     while (1) {
+        printf("Turn: ");
         while (1) {
             printf("\x1b[0m");
             scanf("%2s", inbuf);
@@ -364,13 +366,17 @@ int main() {
         board[id_to_int(inbuf[0])][id_to_int(inbuf[1])] = CROSS;
 
         render();
+        if (is_winning(board) != 0)
+            return 0;
 
         pos move;
-        int score = minimax(board, 3, CIRCLE, -1000000, 1000000, &move);
+        score = minimax(board, 3, CIRCLE, -100000000, 100000000, &move);
 
         board[move.x][move.y] = CIRCLE;
 
         render();
+        if (is_winning(board) != 0)
+            return 0;
     }
 
     return 0;
