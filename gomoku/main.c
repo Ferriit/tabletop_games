@@ -112,7 +112,7 @@ int is_winning(int board[BOARD_WIDTH][BOARD_HEIGHT]) {
     return 0;
 }
 
-void render() {
+void render(pos ai_move) {
     printf("\x1b[H\x1b[2J\x1b[0m%d\n", score);
 
     for (int y = 0; y < BOARD_HEIGHT; y++) {
@@ -132,9 +132,13 @@ void render() {
                         case 1: printf("\x1b[38;5;99m/  \\"); break;
                     }
                 } else if (sym == CIRCLE) {
+                    if (x == ai_move.x && y == ai_move.y)
+                        printf("\x1b[37m");
+                    else
+                        printf("\x1b[38;5;208m");
                     switch (i) {
-                        case 0: printf("\x1b[38;5;208m/  \\"); break;
-                        case 1: printf("\x1b[38;5;208m\\  /"); break;
+                        case 0: printf("/  \\"); break;
+                        case 1: printf("\\  /"); break;
                     }
                 } else {
                     if (i == 0) {
@@ -350,7 +354,7 @@ int main() {
         }
     }
 
-    render();
+    render((pos){.x=-1, .y=-1});
 
     char inbuf[3] = "\0\0\0";
 
@@ -365,7 +369,7 @@ int main() {
         }
         board[id_to_int(inbuf[0])][id_to_int(inbuf[1])] = CROSS;
 
-        render();
+        render((pos){.x=-1, .y=-1});
         if (is_winning(board) != 0)
             return 0;
 
@@ -374,7 +378,7 @@ int main() {
 
         board[move.x][move.y] = CIRCLE;
 
-        render();
+        render(move);
         if (is_winning(board) != 0)
             return 0;
     }
