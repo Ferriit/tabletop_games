@@ -24,3 +24,6 @@ gomoku: dist_dir
 
 connect-4: dist_dir
 	${CC} connect-4/main.c ${C_FLAGS} -o ${DIST_DIR}connect-4
+
+checkers: dist_dir
+	${CC} checkers/main.c ${C_FLAGS} -o ${DIST_DIR}checkers
